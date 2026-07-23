@@ -1,0 +1,177 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 390px;
+  margin: 0;
+  background: #f5f6f8;
+  color: #17191c;
+}
+
+main {
+  padding: 16px;
+}
+
+header {
+  margin-bottom: 14px;
+}
+
+h1 {
+  margin: 0 0 5px;
+  font-size: 20px;
+}
+
+p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+header p {
+  color: #5a616b;
+  font-size: 12px;
+}
+
+button {
+  min-height: 38px;
+  border: 1px solid #c8cdd4;
+  border-radius: 7px;
+  padding: 8px 12px;
+  background: #ffffff;
+  color: #17191c;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+button:hover {
+  background: #eef0f3;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+button.primary {
+  border-color: #1769aa;
+  background: #1769aa;
+  color: #ffffff;
+}
+
+button.primary:hover {
+  background: #13598f;
+}
+
+#parseButton {
+  width: 100%;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#resultSection {
+  margin-top: 14px;
+  border: 1px solid #d8dce2;
+  border-radius: 9px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  margin: 0;
+}
+
+.summary div {
+  min-width: 0;
+}
+
+.summary dt {
+  color: #69717c;
+  font-size: 11px;
+}
+
+.summary dd {
+  margin: 3px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.warning {
+  margin-top: 10px;
+  border-radius: 6px;
+  padding: 8px;
+  background: #fff4d6;
+  color: #6b4d00;
+  font-size: 12px;
+}
+
+.status {
+  min-height: 19px;
+  margin-top: 10px;
+  color: #4f5863;
+  font-size: 12px;
+}
+
+.status.error {
+  color: #a02020;
+}
+
+.status.success {
+  color: #176b36;
+}
+
+details {
+  margin-top: 12px;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.table-wrap {
+  max-height: 220px;
+  margin-top: 8px;
+  overflow: auto;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+th,
+td {
+  padding: 6px;
+  border-bottom: 1px solid #eceef1;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th:last-child,
+td:last-child {
+  text-align: right;
+}

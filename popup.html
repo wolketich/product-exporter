@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Camden Product Exporter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Camden Export</h1>
+        <p>Copy Camden products and displayed prices as import-ready JSON.</p>
+      </div>
+    </header>
+
+    <button id="parseButton" class="primary" type="button">Parse Camden page</button>
+
+    <section id="resultSection" class="hidden" aria-live="polite">
+      <dl class="summary">
+        <div><dt>Order</dt><dd id="orderReference">-</dd></div>
+        <div><dt>Products</dt><dd id="productCount">0</dd></div>
+        <div><dt>Total</dt><dd id="totalPrice">€0.00</dd></div>
+      </dl>
+
+      <p id="warning" class="warning hidden"></p>
+
+      <div class="actions">
+        <button id="copyButton" class="primary" type="button">Copy JSON</button>
+        <button id="downloadButton" type="button">Download JSON</button>
+      </div>
+
+      <details>
+        <summary>Preview</summary>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Ref</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Price</th>
+              </tr>
+            </thead>
+            <tbody id="previewBody"></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <p id="status" class="status" role="status"></p>
+  </main>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
