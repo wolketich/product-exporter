@@ -3,22 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Camden Product Exporter</title>
+  <title>Supplier Product Exporter</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <main>
     <header>
       <div>
-        <h1>Camden Export</h1>
-        <p>Copy Camden products and displayed prices as import-ready JSON.</p>
+        <h1>Supplier Export</h1>
+        <p>Copy Camden or Frames Direct products and prices as import-ready JSON.</p>
       </div>
     </header>
 
-    <button id="parseButton" class="primary" type="button">Parse Camden page</button>
+    <button id="parseButton" class="primary" type="button">Parse current quotation</button>
 
     <section id="resultSection" class="hidden" aria-live="polite">
       <dl class="summary">
+        <div><dt>Supplier</dt><dd id="supplierName">-</dd></div>
         <div><dt>Order</dt><dd id="orderReference">-</dd></div>
         <div><dt>Products</dt><dd id="productCount">0</dd></div>
         <div><dt>Total</dt><dd id="totalPrice">€0.00</dd></div>
@@ -38,9 +39,10 @@
             <thead>
               <tr>
                 <th>Ref</th>
-                <th>Type</th>
+                <th>Product</th>
                 <th>Size</th>
-                <th>Price</th>
+                <th>Qty</th>
+                <th>Unit price</th>
               </tr>
             </thead>
             <tbody id="previewBody"></tbody>

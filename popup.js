@@ -1,9 +1,10 @@
-import { extractCamdenPage } from "./extractor.js";
+import { extractSupplierPage } from "./extractor.js";
 
 const parseButton = document.getElementById("parseButton");
 const copyButton = document.getElementById("copyButton");
 const downloadButton = document.getElementById("downloadButton");
 const resultSection = document.getElementById("resultSection");
+const supplierName = document.getElementById("supplierName");
 const orderReference = document.getElementById("orderReference");
 const productCount = document.getElementById("productCount");
 const totalPrice = document.getElementById("totalPrice");
@@ -27,22 +28,36 @@ function money(value) {
 
 function setBusy(isBusy) {
   parseButton.disabled = isBusy;
-  parseButton.textContent = isBusy ? "Parsing..." : "Parse Camden page";
+  parseButton.textContent = isBusy ? "Parsing..." : "Parse current quotation";
 }
 
 function cleanForImport(product) {
-  return {
-    description: product.description,
-    location: product.location,
-    manufacturer: product.manufacturer,
-    quantity: product.quantity,
-    price: product.price,
-    size: product.size,
-    camdenFrameNumber: product.camdenFrameNumber,
-    camdenOrderProductId: product.camdenOrderProductId,
-    camdenSystemTypeId: product.camdenSystemTypeId,
-    colour: product.colour
-  };
+  const keys = [
+    "description",
+    "location",
+    "manufacturer",
+    "quantity",
+    "price",
+    "size",
+    "source",
+    "sourceIndex",
+    "linePrice",
+    "colour",
+    "externalColour",
+    "internalColour",
+    "hardwareColour",
+    "glazing",
+    "camdenFrameNumber",
+    "camdenOrderProductId",
+    "camdenSystemTypeId",
+    "framesDirectProductId"
+  ];
+
+  return Object.fromEntries(
+    keys
+      .filter(key => product[key] !== undefined && product[key] !== "")
+      .map(key => [key, product[key]])
+  );
 }
 
 function exportJson() {
@@ -55,7 +70,8 @@ function render(data) {
   const meta = data.meta ?? {};
   const products = data.products ?? [];
 
-  orderReference.textContent = meta.orderReference || meta.customerReference || "Camden quotation";
+  supplierName.textContent = meta.source || "Supplier";
+  orderReference.textContent = meta.orderReference || meta.customerReference || "Quotation";
   orderReference.title = [meta.orderReference, meta.customerReference].filter(Boolean).join(" | ");
   productCount.textContent = String(products.length);
   totalPrice.textContent = money(meta.total);
@@ -75,6 +91,7 @@ function render(data) {
       product.location,
       product.description,
       product.size || "-",
+      product.quantity,
       money(product.price)
     ];
 
@@ -106,7 +123,7 @@ async function parsePage() {
     const runParser = async allFrames => {
       const injections = await chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames },
-        func: extractCamdenPage
+        func: extractSupplierPage
       });
 
       return injections
@@ -121,20 +138,20 @@ async function parsePage() {
       try {
         data = await runParser(true);
       } catch {
-        // The quotation is normally in the main frame. Some pages contain
-        // cross-origin frames that activeTab cannot access, so ignore them.
+        // Ignore inaccessible cross-origin frames.
       }
     }
+
     if (!data || data.products.length === 0) {
-      throw new Error("No Camden product tiles were found. Open the Camden quotation page and make sure product prices are visible.");
+      throw new Error("No Camden or Frames Direct products were found. Open the quotation page and make sure the products and prices are visible.");
     }
 
     render(data);
-    setStatus(`Parsed ${data.products.length} Camden product(s).`, "success");
+    setStatus(`Parsed ${data.products.length} ${data.meta?.source || "supplier"} product(s).`, "success");
   } catch (error) {
     latestExport = null;
     resultSection.classList.add("hidden");
-    setStatus(error?.message || "Camden parsing failed.", "error");
+    setStatus(error?.message || "Quotation parsing failed.", "error");
   } finally {
     setBusy(false);
   }
@@ -160,11 +177,12 @@ async function copyJson() {
 function downloadJson() {
   if (!latestExport) return;
 
-  const reference = latestExport.meta?.customerReference || latestExport.meta?.orderReference || "camden-products";
-  const safeName = reference
+  const source = latestExport.meta?.source || "supplier";
+  const reference = latestExport.meta?.customerReference || latestExport.meta?.orderReference || `${source}-products`;
+  const safeName = `${source}-${reference}`
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "camden-products";
+    .replace(/^-+|-+$/g, "") || "supplier-products";
 
   const blob = new Blob([exportJson()], { type: "application/json" });
   const url = URL.createObjectURL(blob);

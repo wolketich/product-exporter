@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Camden Product Exporter",
-  "version": "1.0.0",
-  "description": "Extract Camden quotation products and displayed prices into clipboard JSON.",
+  "name": "Camden & Frames Direct Exporter",
+  "version": "1.1.0",
+  "description": "Extract Camden and Frames Direct quotation products and displayed prices into import-ready JSON.",
   "permissions": [
     "activeTab",
     "scripting"
   ],
   "action": {
-    "default_title": "Export Camden products",
+    "default_title": "Export supplier products",
     "default_popup": "popup.html"
   },
   "icons": {

@@ -1,49 +1,51 @@
-# Camden Product Exporter
+# Camden & Frames Direct Exporter
 
-Chrome and Microsoft Edge extension for exporting Camden quotation products and the prices displayed on each product tile.
+Chrome and Microsoft Edge extension for exporting products and displayed prices from Camden and Frames Direct quotations.
 
-## Output
+## Compatible output
 
 The extension copies a JSON array compatible with the supplied importer:
 
 ```json
 [
   {
-    "description": "Window",
-    "location": "BOX",
-    "manufacturer": "Camden",
+    "description": "Elite 70 Ovolo Double Door",
+    "location": "Hall",
+    "manufacturer": "Frames Direct",
     "quantity": 1,
-    "price": 280.72,
-    "size": "1300 x 1300",
-    "camdenFrameNumber": "1",
-    "camdenOrderProductId": "3251912",
-    "camdenSystemTypeId": "2",
-    "colour": "WHITE KNIFED"
+    "price": 1176.83,
+    "size": "1480 x 2330"
   }
 ]
 ```
 
-The existing importer only uses the standard fields. The Camden metadata fields are retained for traceability and are ignored by the importer.
+The importer uses `description` to identify doors, `location` as the line description, `manufacturer` as the supplier, `quantity` as quantity, `price` as unit cost, and `size` for dimensions. Extra metadata is retained for traceability and ignored by the importer.
 
-## Install in Chrome
+## Install or update
 
 1. Extract the ZIP file.
-2. Open `chrome://extensions`.
-3. Enable **Developer mode**.
-4. Select **Load unpacked**.
-5. Choose the `camden-product-exporter` folder.
-
-For Microsoft Edge, use `edge://extensions` and the same steps.
+2. Open `chrome://extensions` or `edge://extensions`.
+3. Enable Developer mode.
+4. Remove the old unpacked extension, or select its Reload button after replacing its files.
+5. Select Load unpacked and choose the `camden-product-exporter` folder.
 
 ## Use
 
-1. Open the Camden quotation page.
-2. Make sure the product tiles and price banners are visible.
-3. Click the extension icon.
-4. Select **Parse Camden page**.
-5. Review the count and total.
-6. Select **Copy JSON**.
-7. In your pricing application, select the existing FD import button.
+1. Open a Camden or Frames Direct quotation.
+2. Make sure the product list and prices are visible.
+3. Open the extension.
+4. Select Parse current quotation.
+5. Review the supplier, count, total, and preview.
+6. Select Copy JSON.
+7. Use the existing import button in the pricing application.
+
+## Frames Direct mapping
+
+- Product cards are detected from the exact `Product:` label inside each indexed product container.
+- Product, location, size, colours, glazing, quantity, and displayed line cost are read from the card.
+- The displayed line cost is divided by quantity so `price` remains a unit cost for the existing importer.
+- The Description and Cost summary table is used as a fallback if product cards are unavailable.
+- The quotation reference is read from `#Reference`.
 
 ## Camden mapping
 
@@ -56,6 +58,6 @@ For Microsoft Edge, use `edge://extensions` and the same steps.
 
 ## Important
 
-- The extension exports the amount Camden displays. It does not add or remove VAT, discounts, charges, or markup.
-- A product without a visible price is exported with `price: 0` and shown as a warning.
-- Each Camden tile is exported as quantity `1`.
+- The extension exports supplier costs before your own markup.
+- It does not add or remove VAT, discounts, charges, or uplift.
+- Products without a visible price import with `price: 0` and trigger a warning.
