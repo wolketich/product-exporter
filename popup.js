@@ -50,7 +50,10 @@ function cleanForImport(product) {
     "camdenFrameNumber",
     "camdenOrderProductId",
     "camdenSystemTypeId",
-    "framesDirectProductId"
+    "framesDirectProductId",
+    "palladioLayout",
+    "palladioDoorModel",
+    "palladioConfiguration"
   ];
 
   return Object.fromEntries(
@@ -143,7 +146,7 @@ async function parsePage() {
     }
 
     if (!data || data.products.length === 0) {
-      throw new Error("No Camden or Frames Direct products were found. Open the quotation page and make sure the products and prices are visible.");
+      throw new Error("No Camden, Frames Direct, or Palladio products were found. Open the quotation page and make sure the products and prices are visible.");
     }
 
     render(data);

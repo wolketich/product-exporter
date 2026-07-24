@@ -43,14 +43,14 @@ export function extractSupplierPage() {
 
   const parseDimensions = value => {
     const text = normalise(value);
-    const match = text.match(/(\d{2,5})\s*[x×]\s*(\d{2,5})/i);
+    const match = text.match(/(\d{1,3}(?:,\d{3})+|\d{2,5})\s*(?:mm)?\s*[x×]\s*(\d{1,3}(?:,\d{3})+|\d{2,5})\s*(?:mm)?/i);
 
     if (!match) {
       return { widthMm: null, heightMm: null, size: text };
     }
 
-    const widthMm = Number(match[1]);
-    const heightMm = Number(match[2]);
+    const widthMm = Number(match[1].replace(/,/g, ""));
+    const heightMm = Number(match[2].replace(/,/g, ""));
 
     return {
       widthMm,
@@ -319,11 +319,150 @@ export function extractSupplierPage() {
     });
   };
 
+  const extractPalladio = () => {
+    const orderTable = document.querySelector(".table-order-items");
+    if (!orderTable) {
+      return {
+        products: [],
+        orderReference: "",
+        customerReference: "",
+        jobType: ""
+      };
+    }
+
+    const valueFromHeader = label => {
+      const wanted = normalise(label).toLowerCase();
+      const header = [...document.querySelectorAll("th")].find(th =>
+        normalise(th.textContent).toLowerCase() === wanted
+      );
+      if (!header) return "";
+      return normalise(header.nextElementSibling?.textContent);
+    };
+
+    const poElement = document.querySelector(".reseller_order_po_number");
+    const poNumber = normalise(
+      poElement?.getAttribute("data-value") ||
+      poElement?.textContent ||
+      valueFromHeader("PO Number")
+    );
+
+    const topRows = [...orderTable.querySelectorAll("tbody tr.border-strong")];
+    const products = topRows.flatMap((row, index) => {
+      const cells = [...row.children].filter(child => child.tagName === "TD");
+      if (cells.length < 2) return [];
+
+      const itemName = normalise(cells[1]?.textContent);
+      if (!/entrance|door/i.test(itemName)) return [];
+
+      const quantity = Math.max(1, Number.parseFloat(normalise(cells[0]?.textContent)) || 1);
+      const reference = normalise(cells[2]?.textContent) || poNumber || `Palladio Entrance ${index + 1}`;
+      const priceText = normalise(cells.at(-1)?.textContent);
+      const displayedLinePrice = parseMoney(priceText);
+      const unitPrice = displayedLinePrice === null
+        ? 0
+        : roundMoney(displayedLinePrice / quantity);
+
+      const detailRows = [];
+      let sibling = row.nextElementSibling;
+      while (sibling && !sibling.classList.contains("border-strong")) {
+        detailRows.push(sibling);
+        sibling = sibling.nextElementSibling;
+      }
+
+      const findDetail = (className, pattern = null) => {
+        for (const detailRow of detailRows) {
+          const cell = detailRow.querySelector(`td.${className}`);
+          if (!cell) continue;
+          const title = ownText(cell).replace(/[,\s]+$/, "");
+          if (!pattern || pattern.test(title)) {
+            return {
+              cell,
+              title,
+              detail: normalise(cell.querySelector("small.text-muted")?.textContent)
+            };
+          }
+        }
+        return null;
+      };
+
+      const layout = findDetail("indent-level-0");
+      const frame = findDetail("indent-level-1", /^Door Frame\b/i);
+      const leaf = findDetail("indent-level-2", /^Door Leaf\b/i);
+      const accessoryRows = detailRows.map(detailRow => {
+        const cell = detailRow.querySelector('td[class*="indent-level-"]');
+        if (!cell) return "";
+        const title = ownText(cell).replace(/[,\s]+$/, "");
+        const detail = normalise(cell.querySelector("small.text-muted")?.textContent);
+        return normalise([title, detail].filter(Boolean).join(": "));
+      }).filter(Boolean);
+
+      const layoutDetail = layout?.detail || "";
+      const dimensions = parseDimensions(layoutDetail);
+      const layoutName = normalise(
+        layoutDetail
+          .replace(/,?\s*(?:\d{1,3}(?:,\d{3})+|\d{2,5})\s*(?:mm)?\s*[x×]\s*(?:\d{1,3}(?:,\d{3})+|\d{2,5})\s*(?:mm)?.*$/i, "")
+          .replace(/[,.\s]+$/, "")
+      );
+
+      const leafModel = normalise(
+        (leaf?.title || "")
+          .replace(/^Door Leaf\s*/i, "")
+          .replace(/[,.\s]+$/, "")
+      );
+
+      const frameColour = normalise(
+        (frame?.title || "")
+          .replace(/^Door Frame\s*/i, "")
+          .replace(/[,.\s]+$/, "")
+      );
+      const colourParts = frameColour.split("/").map(part => normalise(part)).filter(Boolean);
+      const externalColour = colourParts[0] || "";
+      const internalColour = colourParts[1] || colourParts[0] || "";
+
+      const descriptionParts = [
+        "Palladio Door",
+        leafModel,
+        layoutName
+      ].filter(Boolean);
+
+      return [{
+        description: descriptionParts.join(" - "),
+        location: reference,
+        manufacturer: "Palladio",
+        quantity,
+        price: unitPrice,
+        size: dimensions.size || layoutDetail,
+        source: "Palladio",
+        sourceIndex: normalise(row.getAttribute("name")) || String(index + 1),
+        linePrice: displayedLinePrice ?? 0,
+        displayedPrice: priceText,
+        priceFound: displayedLinePrice !== null,
+        widthMm: dimensions.widthMm,
+        heightMm: dimensions.heightMm,
+        colour: frameColour,
+        externalColour,
+        internalColour,
+        palladioLayout: layoutName,
+        palladioDoorModel: leafModel,
+        palladioConfiguration: accessoryRows.join(" | ")
+      }];
+    });
+
+    return {
+      products,
+      orderReference: valueFromHeader("Order Number") ||
+        normalise(document.querySelector('a[href*="/reseller_orders/"]')?.getAttribute("href")?.match(/reseller_orders\/(\d+)/)?.[1]),
+      customerReference: poNumber,
+      jobType: valueFromHeader("Order Type") || "Palladio Sale"
+    };
+  };
+
   const camden = extractCamden();
   const framesDirectCards = extractFramesDirectCards();
   const framesDirectProducts = framesDirectCards.length > 0
     ? framesDirectCards
     : extractFramesDirectSummary();
+  const palladio = extractPalladio();
 
   let source = "Unknown";
   let products = [];
@@ -331,18 +470,40 @@ export function extractSupplierPage() {
   let customerReference = "";
   let jobType = "";
 
-  if (camden.products.length > 0 && camden.products.length >= framesDirectProducts.length) {
-    source = "Camden";
-    products = camden.products;
-    orderReference = camden.orderReference;
-    customerReference = camden.customerReference;
-    jobType = camden.jobType;
-  } else if (framesDirectProducts.length > 0) {
-    source = "Frames Direct";
-    products = framesDirectProducts;
-    orderReference = normalise(document.querySelector("#Reference")?.value) ||
-      normalise(document.querySelector('input[name="Reference"]')?.value) ||
-      "Frames Direct quotation";
+  const supplierCandidates = [
+    {
+      source: "Camden",
+      products: camden.products,
+      orderReference: camden.orderReference,
+      customerReference: camden.customerReference,
+      jobType: camden.jobType
+    },
+    {
+      source: "Frames Direct",
+      products: framesDirectProducts,
+      orderReference: normalise(document.querySelector("#Reference")?.value) ||
+        normalise(document.querySelector('input[name="Reference"]')?.value) ||
+        "Frames Direct quotation",
+      customerReference: "",
+      jobType: ""
+    },
+    {
+      source: "Palladio",
+      products: palladio.products,
+      orderReference: palladio.orderReference,
+      customerReference: palladio.customerReference,
+      jobType: palladio.jobType
+    }
+  ].filter(candidate => candidate.products.length > 0)
+    .sort((a, b) => b.products.length - a.products.length);
+
+  if (supplierCandidates.length > 0) {
+    const selected = supplierCandidates[0];
+    source = selected.source;
+    products = selected.products;
+    orderReference = selected.orderReference;
+    customerReference = selected.customerReference;
+    jobType = selected.jobType;
   }
 
   const missingPrices = products.filter(product => !product.priceFound).length;
