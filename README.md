@@ -1,73 +1,101 @@
-# Camden, Frames Direct & Palladio Exporter
+# Supplier Product Exporter
 
-Chrome and Microsoft Edge extension for exporting products and displayed nett prices from Camden, Frames Direct, and Palladio quotations.
+Chrome and Microsoft Edge extension for exporting supplier quotation products and nett costs into JSON for the pricing application.
 
-## Compatible output
+Supported suppliers:
 
-The extension copies a JSON array compatible with the supplied importer:
+- Camden
+- Frames Direct
+- Palladio
+- Eko4U
+
+## Output format
+
+The extension exports one JSON object per product. Example:
 
 ```json
-[
-  {
-    "description": "Palladio Door - Palermo Solid - Full Sidelight Right",
-    "location": "Susan Caldwell",
-    "manufacturer": "Palladio",
-    "quantity": 1,
-    "price": 1239.27,
-    "size": "1300 x 2050"
-  }
-]
+{
+  "description": "Door - Aluprof MB-79N, thermal break system",
+  "type": "Door",
+  "location": "Frame 6",
+  "manufacturer": "Eko4U",
+  "quantity": 1,
+  "price": 1837.98,
+  "size": "1200 x 3515"
+}
 ```
 
-The importer uses `description` to identify doors, `location` as the line description, `manufacturer` as the supplier, `quantity` as quantity, `price` as unit cost, and `size` for dimensions. Extra metadata is retained for traceability and ignored by the importer.
+Non-product charges are exported as separate lines:
+
+```json
+{
+  "description": "Carriage",
+  "location": "Palladio carriage",
+  "manufacturer": "Palladio",
+  "quantity": 1,
+  "price": 91.5,
+  "countMaterials": false,
+  "chargeType": "Carriage"
+}
+```
+
+Use `importer-replacement.js` in the pricing application. It respects `countMaterials: false`, so carriage and surcharge lines import with materials unticked.
 
 ## Install or update
 
 1. Extract the ZIP file.
 2. Open `chrome://extensions` or `edge://extensions`.
 3. Enable Developer mode.
-4. Remove the old unpacked extension, or replace its files and select Reload.
-5. Select Load unpacked and choose the `supplier-product-exporter` folder.
+4. Replace the existing extension files, then select Reload. Alternatively, select Load unpacked and choose the `supplier-product-exporter` folder.
 
 ## Use
 
-1. Open a Camden, Frames Direct, or Palladio quotation.
+1. Open a supported supplier quotation.
 2. Make sure the product list and prices are visible.
 3. Open the extension.
-4. Select Parse current quotation.
-5. Review the supplier, count, total, and preview.
-6. Select Copy JSON.
-7. Use the existing import button in the pricing application.
+4. Select `Parse current quotation`.
+5. Review the preview and total.
+6. Select `Copy JSON`.
+7. Use the supplier import button in the pricing application.
+
+## Eko4U mapping
+
+- Product row: `li.dd-product`
+- Label: `.dd-product__quotation-detail-label`
+- System: `.spanSystem.itemName`
+- Dimensions: the dimensions cell after `.dd-product_system-container`
+- Quantity: `.dd-product__editable--amount span`
+- Unit supplier cost: `data-unit-system-price-value`
+- Fallback unit cost: `.one-piece-price-value`
+- Line cost: `.price_special .totalPriceGrey`
+- Door detection uses explicit door wording first, then full-height product dimensions as a fallback.
 
 ## Palladio mapping
 
-- Each bold `Entrance` row is exported as one complete door product.
-- Child rows for the frame, leaf, sidelights, glass, hardware, and extensions are combined into metadata.
-- The overall entrance dimensions are taken from the layout summary row.
-- The `Nett` value is exported as the supplier line cost.
-- If quantity is above one, the nett line cost is divided by quantity to preserve a unit price.
-- The line reference is used as the location. The PO number is used when the line reference is blank.
-- Carriage and the order grand total are not imported as product lines.
-
-## Frames Direct mapping
-
-- Product cards are detected from the exact `Product:` label inside each indexed product container.
-- Product, location, size, colours, glazing, quantity, and displayed line cost are read from the card.
-- The displayed line cost is divided by quantity so `price` remains a unit cost for the existing importer.
-- The Description and Cost summary table is used as a fallback if product cards are unavailable.
-- The quotation reference is read from `#Reference`.
+- Each bold `Entrance` row is exported as one complete door.
+- Frame, leaf, sidelight, glass, hardware, and accessory rows are retained in metadata.
+- The `Nett` amount is used as the product cost.
+- The `Carriage` nett amount is exported as a separate line with `countMaterials: false`.
+- VAT and grand totals are not imported.
 
 ## Camden mapping
 
 - Product tile: `.selected-window-tile[data-orderproductid]`
 - Dimensions: `.dimensions`
-- Displayed price: `.estimated-price-banner`
-- Room or product reference: `.tile-header h5`
-- Colour: first non-dimension `<small>` in `.tile-header`
-- Door detection: Camden `data-systemtypeid="8"`, or clear door wording in the tile
+- Product cost: `.estimated-price-banner`
+- Room reference: `.tile-header h5`
+- The energy surcharge is detected from a visible row or section labelled `Energy Surcharge` or `Energy Charge`.
+- The energy surcharge is exported as a separate line with `countMaterials: false`.
 
-## Important
+## Frames Direct mapping
 
-- The extension exports supplier costs before your own markup.
-- It does not add or remove VAT, discounts, charges, carriage, or uplift.
-- Products without a visible price import with `price: 0` and trigger a warning.
+- Product cards are detected using the exact `Product:` label.
+- Product, location, dimensions, colours, glazing, quantity, and displayed cost are read from the card.
+- The displayed line cost is divided by quantity to preserve a unit cost.
+- The Description and Cost summary table is used as a fallback.
+
+## Notes
+
+- Prices are exported as supplier nett costs.
+- Missing prices are exported as zero and shown as a warning.
+- Camden energy surcharge can only be exported when the surcharge and amount are present in the page DOM when the extension runs.

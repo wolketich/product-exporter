@@ -105,6 +105,53 @@ export function extractSupplierPage() {
     return candidates[0] || "";
   };
 
+  const findNamedCharge = (patterns, preferredRoot = document) => {
+    const elements = [...preferredRoot.querySelectorAll("tr, li, section, article, div")];
+    const searchableText = element => normalise([
+      element.textContent,
+      element.getAttribute("value"),
+      element.getAttribute("title"),
+      element.getAttribute("aria-label"),
+      element.getAttribute("data-name"),
+      element.getAttribute("data-description"),
+      element.getAttribute("data-charge-name")
+    ].filter(Boolean).join(" "));
+
+    const matches = elements.filter(element => {
+      const text = searchableText(element);
+      return text && patterns.some(pattern => pattern.test(text));
+    });
+
+    const candidates = matches
+      .map(element => {
+        const text = searchableText(element);
+        const moneyTexts = [
+          ownText(element),
+          element.getAttribute("value"),
+          element.getAttribute("data-price"),
+          element.getAttribute("data-amount"),
+          ...[...element.querySelectorAll("td, div, span, strong, p, input")].flatMap(node => [
+            ownText(node),
+            node.getAttribute("value"),
+            node.getAttribute("data-price"),
+            node.getAttribute("data-amount")
+          ])
+        ].map(normalise).filter(Boolean);
+
+        const amounts = moneyTexts
+          .map(value => ({ value, amount: parseMoney(value) }))
+          .filter(entry => entry.amount !== null)
+          .filter(entry => /[€£$]|\d[.,]\d{2}\b/.test(entry.value));
+
+        const amount = amounts.length ? amounts[0].amount : null;
+        return { element, text, amount };
+      })
+      .filter(candidate => candidate.amount !== null)
+      .sort((a, b) => a.text.length - b.text.length);
+
+    return candidates[0] || null;
+  };
+
   const extractCamden = () => {
     const tileSelectors = [
       ".order-product-tile-container .selected-window-tile[data-orderproductid]",
@@ -200,6 +247,29 @@ export function extractSupplierPage() {
       ".viewOrderHeader .camden-cus-reference",
       ".camden-cus-reference"
     ]);
+
+    const energyCharge = findNamedCharge([
+      /\benergy\s+surcharge\b/i,
+      /\benergy\s+charge\b/i
+    ]);
+
+    if (energyCharge && energyCharge.amount !== 0) {
+      products.push({
+        description: "Energy surcharge",
+        location: "Camden energy surcharge",
+        manufacturer: "Camden",
+        quantity: 1,
+        price: roundMoney(energyCharge.amount),
+        size: "",
+        source: "Camden",
+        sourceIndex: "charge-energy",
+        linePrice: roundMoney(energyCharge.amount),
+        displayedPrice: String(energyCharge.amount),
+        priceFound: true,
+        countMaterials: false,
+        chargeType: "Energy surcharge"
+      });
+    }
 
     return {
       products,
@@ -448,6 +518,25 @@ export function extractSupplierPage() {
       }];
     });
 
+    const carriage = findNamedCharge([/^Carriage\b/i], document);
+    if (carriage && carriage.amount !== 0) {
+      products.push({
+        description: "Carriage",
+        location: "Palladio carriage",
+        manufacturer: "Palladio",
+        quantity: 1,
+        price: roundMoney(carriage.amount),
+        size: "",
+        source: "Palladio",
+        sourceIndex: "charge-carriage",
+        linePrice: roundMoney(carriage.amount),
+        displayedPrice: String(carriage.amount),
+        priceFound: true,
+        countMaterials: false,
+        chargeType: "Carriage"
+      });
+    }
+
     return {
       products,
       orderReference: valueFromHeader("Order Number") ||
@@ -457,12 +546,99 @@ export function extractSupplierPage() {
     };
   };
 
+  const extractEko4U = () => {
+    const rows = [...document.querySelectorAll("#listWithProducts li.dd-product, li.dd-product[data-id]")];
+
+    const products = rows.map((row, index) => {
+      const sourceIndex = normalise(row.querySelector(".itemPosition")?.textContent) || String(index + 1);
+      const labelText = normalise(row.querySelector(".dd-product__quotation-detail-label")?.textContent);
+      const location = labelText && !/^\[?none\]?$/i.test(labelText)
+        ? labelText
+        : `Frame ${Number.parseInt(sourceIndex, 10) || index + 1}`;
+
+      const systemName = normalise(row.querySelector(".spanSystem.itemName, .dd-product_system-container .itemName")?.textContent) || "Eko4U product";
+      const dimensionText = normalise(
+        row.querySelector(".dd-product_system-container + div span")?.textContent ||
+        row.querySelector("[data-dimensions]")?.getAttribute("data-dimensions")
+      );
+      const slashDimensions = dimensionText.match(/(\d{2,5}(?:[.,]\d+)?)\s*\/\s*(\d{2,5}(?:[.,]\d+)?)/);
+      const normalisedDimensionText = slashDimensions
+        ? `${Math.round(Number(slashDimensions[1].replace(",", ".")))} x ${Math.round(Number(slashDimensions[2].replace(",", ".")))}`
+        : dimensionText;
+      const dimensions = parseDimensions(normalisedDimensionText);
+
+      const quantity = Math.max(1, Number.parseFloat(normalise(
+        row.querySelector(".dd-product__editable--amount span")?.textContent
+      )) || 1);
+
+      const unitDataPrice = parseMoney(
+        row.getAttribute("data-unit-system-price-value") ||
+        row.getAttribute("data-unit-system-price-raw-value")
+      );
+      const onePiecePriceText = normalise(row.querySelector(".one-piece-price-value")?.textContent);
+      const onePiecePrice = parseMoney(onePiecePriceText);
+      const linePriceText = normalise(row.querySelector(".price_special .totalPriceGrey")?.textContent);
+      const displayedLinePrice = parseMoney(linePriceText);
+
+      const unitPrice = unitDataPrice ?? onePiecePrice ?? (displayedLinePrice === null
+        ? 0
+        : roundMoney(displayedLinePrice / quantity));
+      const linePrice = displayedLinePrice ?? roundMoney(unitPrice * quantity);
+
+      const classificationText = normalise([
+        systemName,
+        labelText,
+        row.getAttribute("data-product-type"),
+        row.getAttribute("data-type"),
+        row.querySelector("svg")?.textContent
+      ].filter(Boolean).join(" ")).toLowerCase();
+
+      const likelyDoorBySize = Number.isFinite(dimensions.heightMm) && dimensions.heightMm >= 1900 &&
+        Number.isFinite(dimensions.widthMm) && dimensions.widthMm <= 1800;
+      const isDoor = /\b(door|entrance|sliding|slider|lift[- ]?slide|bi[- ]?fold|folding|patio|hs)\b/i.test(classificationText) || likelyDoorBySize;
+
+      return {
+        description: `${isDoor ? "Door" : "Window"} - ${systemName}`,
+        location,
+        manufacturer: "Eko4U",
+        quantity,
+        price: roundMoney(unitPrice),
+        size: dimensions.size || normalisedDimensionText,
+        source: "Eko4U",
+        sourceIndex,
+        linePrice,
+        displayedPrice: linePriceText || onePiecePriceText,
+        priceFound: unitDataPrice !== null || onePiecePrice !== null || displayedLinePrice !== null,
+        widthMm: dimensions.widthMm,
+        heightMm: dimensions.heightMm,
+        ekoProductId: normalise(row.getAttribute("data-id")),
+        ekoWindowId: normalise(row.getAttribute("data-window-id")),
+        ekoSystem: systemName,
+        ekoLabel: labelText,
+        type: isDoor ? "Door" : "Window"
+      };
+    });
+
+    return {
+      products,
+      orderReference: normalise(
+        document.querySelector("#reference")?.value ||
+        document.querySelector("#quotation_reference")?.value ||
+        document.querySelector("[name='reference']")?.value ||
+        firstText(document, [".quotation-reference", ".offer-number"])
+      ) || "Eko4U quotation",
+      customerReference: "",
+      jobType: "Eko4U quotation"
+    };
+  };
+
   const camden = extractCamden();
   const framesDirectCards = extractFramesDirectCards();
   const framesDirectProducts = framesDirectCards.length > 0
     ? framesDirectCards
     : extractFramesDirectSummary();
   const palladio = extractPalladio();
+  const eko4u = extractEko4U();
 
   let source = "Unknown";
   let products = [];
@@ -493,6 +669,13 @@ export function extractSupplierPage() {
       orderReference: palladio.orderReference,
       customerReference: palladio.customerReference,
       jobType: palladio.jobType
+    },
+    {
+      source: "Eko4U",
+      products: eko4u.products,
+      orderReference: eko4u.orderReference,
+      customerReference: eko4u.customerReference,
+      jobType: eko4u.jobType
     }
   ].filter(candidate => candidate.products.length > 0)
     .sort((a, b) => b.products.length - a.products.length);
